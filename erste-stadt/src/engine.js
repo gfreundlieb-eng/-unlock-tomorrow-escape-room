@@ -9,6 +9,7 @@ const Engine = (() => {
   const ray = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const keys = {};
+  const stick = { active: false, id: null, x: 0, y: 0, cx: 0, cy: 0 };
   let down = null;
   let cutscene = null;
   let blocked = () => false; // wird von main gesetzt (Panel offen?)
@@ -91,6 +92,41 @@ const Engine = (() => {
     window.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; keys[e.key.toLowerCase()] = true; });
     window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
+    bindStick();
+  }
+
+  // Virtueller Joystick (unten links) – zweiter Finger kann gleichzeitig umsehen
+  function bindStick() {
+    const base = document.getElementById('stick');
+    if (!base) return;
+    const knob = base.querySelector('.knob');
+    const R = 46;
+    const set = (dx, dy) => {
+      const d = Math.hypot(dx, dy) || 1, k = d > R ? R / d : 1;
+      stick.x = dx * k / R; stick.y = dy * k / R;
+      knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+    };
+    base.addEventListener('pointerdown', e => {
+      if (stick.active || blocked() || cutscene) return;
+      stick.active = true; stick.id = e.pointerId;
+      try { base.setPointerCapture(e.pointerId); } catch (_) {}
+      const r = base.getBoundingClientRect();
+      stick.cx = r.left + r.width / 2; stick.cy = r.top + r.height / 2;
+      set(e.clientX - stick.cx, e.clientY - stick.cy);
+      base.classList.add('on');
+      e.preventDefault();
+    });
+    base.addEventListener('pointermove', e => {
+      if (!stick.active || e.pointerId !== stick.id) return;
+      set(e.clientX - stick.cx, e.clientY - stick.cy);
+    });
+    const end = e => {
+      if (!stick.active || e.pointerId !== stick.id) return;
+      stick.active = false; stick.x = stick.y = 0;
+      knob.style.transform = ''; base.classList.remove('on');
+    };
+    base.addEventListener('pointerup', end);
+    base.addEventListener('pointercancel', end);
   }
 
   function pick(cx, cy) {
@@ -187,10 +223,16 @@ const Engine = (() => {
       if (keys['arrowright']) player.yaw -= 2 * dt;
       if (keys['q']) player.yaw += 2 * dt;
       if (keys['e']) player.yaw -= 2 * dt;
-      if (f || s) {
+      let jf = 0, js = 0;
+      if (stick.active) {
+        const mag = Math.hypot(stick.x, stick.y);
+        if (mag > 0.15) { jf = -stick.y; js = stick.x; } // nach oben = vorwärts
+      }
+      if (f || s || jf || js) {
         player.tx = null; player.onArrive = null; player.faceYaw = null;
-        mx = (-Math.sin(player.yaw) * f + Math.cos(player.yaw) * s) * speed * dt;
-        mz = (-Math.cos(player.yaw) * f - Math.sin(player.yaw) * s) * speed * dt;
+        const F = Math.max(-1, Math.min(1, f + jf)), S = Math.max(-1, Math.min(1, s + js));
+        mx = (-Math.sin(player.yaw) * F + Math.cos(player.yaw) * S) * speed * dt;
+        mz = (-Math.cos(player.yaw) * F - Math.sin(player.yaw) * S) * speed * dt;
       }
     }
     if (player.tx !== null) {
