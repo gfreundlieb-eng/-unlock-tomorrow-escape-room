@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta name="theme-color" content="#17120e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Das Geheimnis der ersten Stadt</title>
+<style>
+/*CSS*/
+</style>
+</head>
+<body>
+<canvas id="world" aria-label="3D-Spielwelt" tabindex="-1"></canvas>
+<div id="fade"></div>
+<div id="loading">Die Höhle wird geladen …</div>
+
+<!-- HUD -->
+<header id="hud">
+  <div class="hud-left">
+    <span class="brand">Das Geheimnis der ersten Stadt</span>
+    <span class="pill" id="where">Die Höhle</span>
+  </div>
+  <div class="hud-mid">
+    <div id="tabs" aria-label="Gefundene Steintäfelchen"></div>
+    <span class="pill" title="Gelöste Rätsel">🧩 <b id="prog">0/0</b></span>
+    <span class="pill" title="Spielzeit">⏱ <b id="timer">0:00</b></span>
+    <span class="pill lvl" id="lvl">Entdecker</span>
+  </div>
+  <div class="hud-right">
+    <button class="hbtn" id="btn-journal" type="button">📖 <span>Forscherbuch</span></button>
+    <button class="hbtn" id="btn-help" type="button" aria-label="Steuerung">❓</button>
+    <button class="hbtn" id="btn-menu" type="button" aria-label="Menü">⚙️</button>
+  </div>
+</header>
+<div id="status" hidden></div>
+<button id="btn-home" class="hbtn floating" type="button" hidden>↩ Zur Höhle</button>
+<button id="skip" class="hbtn floating-r" type="button" hidden>Überspringen ⏭</button>
+<div id="toasts" aria-live="polite"></div>
+<div id="nogl-note">3D-Ansicht nicht verfügbar. Ihr könnt trotzdem spielen: Öffnet das <b>Forscherbuch</b> und tippt auf „Hingehen“.</div>
+
+<!-- Rätsel-Panel -->
+<div id="panel" class="hidden" role="dialog" aria-modal="true" aria-labelledby="p-title">
+  <div class="panel-card">
+    <header class="p-head">
+      <span id="p-kind" class="kind"></span>
+      <h2 id="p-title"></h2>
+      <button id="p-close" class="xbtn" type="button" aria-label="Schließen">✕</button>
+    </header>
+    <div id="p-body"></div>
+    <div id="p-hints"></div>
+    <footer class="p-foot">
+      <button id="p-tip" class="btn tip" type="button">Tipp</button>
+      <div id="p-feedback" aria-live="polite"></div>
+      <button id="p-check" class="btn primary" type="button">Prüfen</button>
+      <button id="p-next" class="btn primary" type="button" hidden>Weiter</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Info -->
+<div id="info" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="i-title">
+  <div class="card-box">
+    <h2 id="i-title"></h2>
+    <div id="i-body"></div>
+    <div class="row-end"><button id="i-close" class="btn primary" type="button">Verstanden</button></div>
+  </div>
+</div>
+
+<!-- Forscherbuch -->
+<div id="journal" class="overlay hidden side" role="dialog" aria-modal="true" aria-label="Forscherbuch">
+  <div class="card-box journal">
+    <div class="row-between"><h2>📖 Forscherbuch</h2><button id="j-close" class="xbtn" type="button" aria-label="Schließen">✕</button></div>
+    <div id="j-body"></div>
+  </div>
+</div>
+
+<!-- Menü -->
+<div id="menu" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Menü">
+  <div class="card-box">
+    <div class="row-between"><h2>⚙️ Menü</h2><button id="m-close" class="xbtn" type="button" aria-label="Schließen">✕</button></div>
+    <label class="toggle"><input type="checkbox" id="m-skip"> Animationen überspringen</label>
+    <label class="toggle"><input type="checkbox" id="m-big"> Große Schrift</label>
+    <p class="small">Schwierigkeitsstufe: <b id="m-level"></b> (kann nur bei einem neuen Spiel geändert werden)</p>
+    <div class="menu-btns">
+      <button id="m-teacher" class="btn" type="button">👩‍🏫 Lehrkraft</button>
+      <button id="m-restart" class="btn danger" type="button">Spiel neu starten</button>
+    </div>
+    <p class="small">Alle Texte im Spiel sind Lerntexte. Figuren wie Dr. Mila Ostermann sind erfunden. Die 3D-Szenen und Bilder sind vereinfachte Rekonstruktionen, keine Originalquellen.</p>
+  </div>
+</div>
+
+<div id="teacher" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Lehrkraft">
+  <div class="card-box">
+    <div class="row-between"><h2>👩‍🏫 Lehrkraft</h2><button id="t-close" class="xbtn" type="button" aria-label="Schließen">✕</button></div>
+    <div id="t-body" class="menu-btns col"></div>
+  </div>
+</div>
+
+<!-- Belohnung -->
+<div id="reward" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Steintäfelchen gefunden">
+  <div class="card-box center">
+    <h2>Steintäfelchen gefunden!</h2>
+    <img id="rw-img" alt="Steintäfelchen" class="rw-img">
+    <p id="rw-text"></p>
+    <p id="rw-next" class="small"></p>
+    <div class="row-center"><button id="rw-stay" class="btn" type="button">Noch umsehen</button><button id="rw-home" class="btn primary" type="button">Zurück zur Höhle</button></div>
+  </div>
+</div>
+
+<!-- Start -->
+<div id="start" class="overlay hidden full">
+  <div class="start-box">
+    <div class="start-art" aria-hidden="true"><span>⛰️</span><span>🔥</span><span>🏛️</span></div>
+    <h1>Das Geheimnis der ersten Stadt</h1>
+    <p class="lead">Ein Escape-Game durch die Steinzeit bis zur ersten Stadt Mesopotamiens</p>
+    <button id="s-continue" class="btn primary big" type="button" hidden>▶ Weiterspielen <span></span></button>
+    <label class="field">Name eures Teams <small>(freiwillig)</small><input id="s-team" type="text" maxlength="40" placeholder="z. B. Die Feuersteine" autocomplete="off"></label>
+    <div class="levels" role="group" aria-label="Schwierigkeitsstufe">
+      <button class="lvl-btn" data-level="entdecker" aria-pressed="true" type="button"><b>🧭 Entdecker</b><span>Weniger Karten, mehr Hilfen, falsche Antworten werden markiert.</span></button>
+      <button class="lvl-btn" data-level="experten" aria-pressed="false" type="button"><b>🔍 Experten</b><span>Mehr Karten, schwierigere Aufgaben, weniger Rückmeldung.</span></button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="s-skip"> Animationen überspringen</label>
+    <button id="s-start" class="btn primary big" type="button">Neues Spiel starten</button>
+    <p class="small">Spielzeit: ca. 30–35 Minuten · in Gruppen von 2–3 · Der Spielstand wird auf diesem Gerät gespeichert.</p>
+  </div>
+</div>
+
+<!-- Geschichte -->
+<div id="story" class="overlay hidden full">
+  <div class="story-box">
+    <h2 id="st-title"></h2>
+    <p id="st-text" class="in"></p>
+    <div id="st-dots"></div>
+    <div class="row-center"><button id="st-skip" class="btn" type="button">Überspringen</button><button id="st-next" class="btn primary" type="button">Weiter</button></div>
+  </div>
+</div>
+
+<!-- Finale -->
+<div id="final" class="overlay hidden full">
+  <div class="final-box">
+    <div class="final-ic" aria-hidden="true">🏛️</div>
+    <h1>Ihr habt das Geheimnis gelüftet!</h1>
+    <p id="f-team" class="lead"></p>
+    <div id="f-stats"></div>
+    <h3>Die Antwort auf die große Frage</h3>
+    <p class="q-big">Wie wurden aus kleinen Dörfern die ersten Hochkulturen?</p>
+    <div class="note"><p id="f-merk"></p></div>
+    <p id="f-aus"></p>
+    <p class="small">Abschlusscode für eure Lehrkraft: <b id="f-code"></b></p>
+    <div class="row-center"><button id="f-stay" class="btn" type="button">Uruk weiter erkunden</button><button id="f-new" class="btn primary" type="button">Neues Spiel</button></div>
+  </div>
+</div>
+
+<script>
+/*JS*/
+</script>
+</body>
+</html>
