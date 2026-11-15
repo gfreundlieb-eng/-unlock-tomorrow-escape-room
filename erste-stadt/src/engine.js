@@ -76,8 +76,8 @@ const Engine = (() => {
       if (!down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12) down.moved = true;
       if (down.moved) {
         const k = e.pointerType === 'mouse' ? 0.0045 : 0.0060;
-        player.yaw += dx * k * look.ix;
-        player.pitch = Math.max(-1.1, Math.min(1.15, player.pitch + dy * k * 0.8 * look.iy));
+        player.yaw -= dx * k * look.ix;
+        player.pitch = Math.max(-1.1, Math.min(1.15, player.pitch - dy * k * 0.8 * look.iy));
         player.faceYaw = null;
       }
       down.lx = e.clientX; down.ly = e.clientY;
