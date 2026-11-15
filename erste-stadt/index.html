@@ -359,6 +359,9 @@ html.noanim .win-ic { animation: none; }
     <div class="row-between"><h2>⚙️ Menü</h2><button id="m-close" class="xbtn" type="button" aria-label="Schließen">✕</button></div>
     <label class="toggle"><input type="checkbox" id="m-skip"> Animationen überspringen</label>
     <label class="toggle"><input type="checkbox" id="m-big"> Große Schrift</label>
+    <p class="small" style="margin-bottom:.2rem"><b>Umsehen (Wischen):</b></p>
+    <label class="toggle"><input type="checkbox" id="m-invy"> Hoch/Runter umkehren</label>
+    <label class="toggle"><input type="checkbox" id="m-invx"> Links/Rechts umkehren</label>
     <p class="small">Schwierigkeitsstufe: <b id="m-level"></b> (kann nur bei einem neuen Spiel geändert werden)</p>
     <div class="menu-btns">
       <button id="m-teacher" class="btn" type="button">👩‍🏫 Lehrkraft</button>
@@ -1424,6 +1427,7 @@ const Engine = (() => {
   const ndc = new THREE.Vector2();
   const keys = {};
   const stick = { active: false, id: null, x: 0, y: 0, cx: 0, cy: 0 };
+  const look = { ix: 1, iy: 1 }; // 1 = Standard, -1 = umgekehrt
   let down = null;
   let cutscene = null;
   let blocked = () => false; // wird von main gesetzt (Panel offen?)
@@ -1489,8 +1493,8 @@ const Engine = (() => {
       if (!down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12) down.moved = true;
       if (down.moved) {
         const k = e.pointerType === 'mouse' ? 0.0045 : 0.0060;
-        player.yaw += dx * k;
-        player.pitch = Math.max(-1.1, Math.min(1.15, player.pitch + dy * k * 0.8));
+        player.yaw += dx * k * look.ix;
+        player.pitch = Math.max(-1.1, Math.min(1.15, player.pitch + dy * k * 0.8 * look.iy));
         player.faceYaw = null;
       }
       down.lx = e.clientX; down.ly = e.clientY;
@@ -1699,7 +1703,7 @@ const Engine = (() => {
   }
 
   return {
-    init, setWorld, goUse, walkTo, playCutscene, finishCutscene,
+    init, setWorld, goUse, walkTo, playCutscene, finishCutscene, look,
     get ok() { return ok; }, get world() { return world; }, get camera() { return camera; }, player,
     inCutscene: () => !!cutscene,
     resize
@@ -2969,7 +2973,7 @@ const TEACHER_PIN = '1940';
 function freshState(level, team) {
   return { v: 1, level, team: team || '', solved: {}, hints: {}, tablets: {}, found: {}, seen: {}, reveal: {}, introSeen: {},
     gateOpen: false, done: false, elapsed: 0, fails: 0, where: 'hub', teacherUnlock: false,
-    settings: { skipAnim: matchMedia('(prefers-reduced-motion: reduce)').matches, bigText: false } };
+    settings: { skipAnim: matchMedia('(prefers-reduced-motion: reduce)').matches, bigText: false, invertX: false, invertY: false } };
 }
 let S = null;
 let running = false;
@@ -3311,12 +3315,16 @@ function closeJournal() { hideOverlay('#journal'); refreshAll(); }
 function openMenu() {
   $('#m-skip').checked = S.settings.skipAnim;
   $('#m-big').checked = S.settings.bigText;
+  $('#m-invy').checked = !!S.settings.invertY;
+  $('#m-invx').checked = !!S.settings.invertX;
   $('#m-level').textContent = LEVELS[S.level].name;
   $('#menu').classList.remove('hidden');
 }
 function applySettings() {
   document.documentElement.classList.toggle('big', !!(S && S.settings.bigText));
   document.documentElement.classList.toggle('noanim', !!(S && S.settings.skipAnim));
+  Engine.look.ix = S && S.settings.invertX ? -1 : 1;
+  Engine.look.iy = S && S.settings.invertY ? -1 : 1;
 }
 
 function teacherMenu() {
@@ -3413,6 +3421,8 @@ function boot() {
   $('#m-close').addEventListener('click', () => hideOverlay('#menu'));
   $('#m-skip').addEventListener('change', e => { S.settings.skipAnim = e.target.checked; save(); applySettings(); });
   $('#m-big').addEventListener('change', e => { S.settings.bigText = e.target.checked; save(); applySettings(); });
+  $('#m-invy').addEventListener('change', e => { S.settings.invertY = e.target.checked; save(); applySettings(); });
+  $('#m-invx').addEventListener('change', e => { S.settings.invertX = e.target.checked; save(); applySettings(); });
   $('#m-restart').addEventListener('click', () => { if (confirm('Spiel wirklich neu starten? Der ganze Fortschritt geht verloren.')) { try { localStorage.removeItem(SAVE_KEY); } catch (_) {} location.reload(); } });
   $('#m-teacher').addEventListener('click', () => { hideOverlay('#menu'); teacherMenu(); });
   $('#t-close').addEventListener('click', () => hideOverlay('#teacher'));

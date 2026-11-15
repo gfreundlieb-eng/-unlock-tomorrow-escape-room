@@ -10,6 +10,7 @@ const Engine = (() => {
   const ndc = new THREE.Vector2();
   const keys = {};
   const stick = { active: false, id: null, x: 0, y: 0, cx: 0, cy: 0 };
+  const look = { ix: 1, iy: 1 }; // 1 = Standard, -1 = umgekehrt
   let down = null;
   let cutscene = null;
   let blocked = () => false; // wird von main gesetzt (Panel offen?)
@@ -75,8 +76,8 @@ const Engine = (() => {
       if (!down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12) down.moved = true;
       if (down.moved) {
         const k = e.pointerType === 'mouse' ? 0.0045 : 0.0060;
-        player.yaw += dx * k;
-        player.pitch = Math.max(-1.1, Math.min(1.15, player.pitch + dy * k * 0.8));
+        player.yaw += dx * k * look.ix;
+        player.pitch = Math.max(-1.1, Math.min(1.15, player.pitch + dy * k * 0.8 * look.iy));
         player.faceYaw = null;
       }
       down.lx = e.clientX; down.ly = e.clientY;
@@ -285,7 +286,7 @@ const Engine = (() => {
   }
 
   return {
-    init, setWorld, goUse, walkTo, playCutscene, finishCutscene,
+    init, setWorld, goUse, walkTo, playCutscene, finishCutscene, look,
     get ok() { return ok; }, get world() { return world; }, get camera() { return camera; }, player,
     inCutscene: () => !!cutscene,
     resize

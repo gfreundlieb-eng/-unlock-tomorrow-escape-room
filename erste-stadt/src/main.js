@@ -12,7 +12,7 @@ const TEACHER_PIN = '1940';
 function freshState(level, team) {
   return { v: 1, level, team: team || '', solved: {}, hints: {}, tablets: {}, found: {}, seen: {}, reveal: {}, introSeen: {},
     gateOpen: false, done: false, elapsed: 0, fails: 0, where: 'hub', teacherUnlock: false,
-    settings: { skipAnim: matchMedia('(prefers-reduced-motion: reduce)').matches, bigText: false } };
+    settings: { skipAnim: matchMedia('(prefers-reduced-motion: reduce)').matches, bigText: false, invertX: false, invertY: false } };
 }
 let S = null;
 let running = false;
@@ -354,12 +354,16 @@ function closeJournal() { hideOverlay('#journal'); refreshAll(); }
 function openMenu() {
   $('#m-skip').checked = S.settings.skipAnim;
   $('#m-big').checked = S.settings.bigText;
+  $('#m-invy').checked = !!S.settings.invertY;
+  $('#m-invx').checked = !!S.settings.invertX;
   $('#m-level').textContent = LEVELS[S.level].name;
   $('#menu').classList.remove('hidden');
 }
 function applySettings() {
   document.documentElement.classList.toggle('big', !!(S && S.settings.bigText));
   document.documentElement.classList.toggle('noanim', !!(S && S.settings.skipAnim));
+  Engine.look.ix = S && S.settings.invertX ? -1 : 1;
+  Engine.look.iy = S && S.settings.invertY ? -1 : 1;
 }
 
 function teacherMenu() {
@@ -456,6 +460,8 @@ function boot() {
   $('#m-close').addEventListener('click', () => hideOverlay('#menu'));
   $('#m-skip').addEventListener('change', e => { S.settings.skipAnim = e.target.checked; save(); applySettings(); });
   $('#m-big').addEventListener('change', e => { S.settings.bigText = e.target.checked; save(); applySettings(); });
+  $('#m-invy').addEventListener('change', e => { S.settings.invertY = e.target.checked; save(); applySettings(); });
+  $('#m-invx').addEventListener('change', e => { S.settings.invertX = e.target.checked; save(); applySettings(); });
   $('#m-restart').addEventListener('click', () => { if (confirm('Spiel wirklich neu starten? Der ganze Fortschritt geht verloren.')) { try { localStorage.removeItem(SAVE_KEY); } catch (_) {} location.reload(); } });
   $('#m-teacher').addEventListener('click', () => { hideOverlay('#menu'); teacherMenu(); });
   $('#t-close').addEventListener('click', () => hideOverlay('#teacher'));
