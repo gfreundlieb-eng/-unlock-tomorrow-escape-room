@@ -62,6 +62,7 @@ const Puzzles = (() => {
   const $ = s => document.querySelector(s);
 
   function open(id) {
+    killDrag();
     const level = api.level();
     const def = puzzleDef(id, level);
     const key = id + ':' + level;
@@ -85,6 +86,7 @@ const Puzzles = (() => {
   function showSolved(id) { open(id); solved(); }
 
   function close() {
+    killDrag();
     const panel = $('#panel');
     if (panel.classList.contains('hidden')) return;
     panel.classList.add('hidden');
@@ -101,6 +103,7 @@ const Puzzles = (() => {
 
   // --------------------------------------------------- Rendering
   function render() {
+    killDrag();
     const body = $('#p-body'); body.innerHTML = '';
     const d = cur.def;
     if (d.intro) body.appendChild(el('div', { class: 'intro', html: d.intro }));
@@ -171,13 +174,27 @@ const Puzzles = (() => {
   }
 
   let drag = null;
+  // Räumt jede Spur eines Ziehvorgangs weg: schwebende Kopie, halbtransparente
+  // Karte, Hervorhebungen. Wird bei jedem Ende, Abbruch, Neuzeichnen, Öffnen und
+  // Schließen aufgerufen – so kann keine Kopie hängen bleiben.
+  function killDrag() {
+    if (drag && drag.el) { try { drag.el.releasePointerCapture(drag.pid); } catch (_) {} }
+    drag = null;
+    document.querySelectorAll('.card.ghost').forEach(g => g.remove());
+    document.querySelectorAll('.card.dragging').forEach(c => c.classList.remove('dragging'));
+    document.querySelectorAll('.zone.hover, .pool.hover').forEach(z => z.classList.remove('hover'));
+  }
   function bindDnD(body) {
     body.querySelectorAll('.card').forEach(c => {
       c.addEventListener('pointerdown', e => {
         if (e.button > 0) return;
-        drag = { id: c.dataset.item, x0: e.clientX, y0: e.clientY, el: c, dragging: false, pid: e.pointerId };
         e.preventDefault();
+        if (drag) return; // immer nur eine Karte gleichzeitig (zweiter Finger wird ignoriert)
+        drag = { id: c.dataset.item, x0: e.clientX, y0: e.clientY, el: c, dragging: false, pid: e.pointerId };
+        try { c.setPointerCapture(e.pointerId); } catch (_) {}
       });
+      // Verliert die Karte den Finger unerwartet (z. B. weil sie neu gezeichnet wurde), Ziehen abbrechen
+      c.addEventListener('lostpointercapture', e => { if (drag && drag.pid === e.pointerId && drag.el === c) killDrag(); });
     });
     body.querySelectorAll('[data-zone]').forEach(z => {
       z.addEventListener('click', e => {
@@ -188,12 +205,17 @@ const Puzzles = (() => {
   }
   window.addEventListener('pointermove', e => {
     if (!drag || e.pointerId !== drag.pid) return;
+    // Maus: Taste schon losgelassen, aber kein pointerup angekommen → aufräumen
+    if (e.pointerType === 'mouse' && e.buttons === 0) { const wasDragging = drag.dragging; killDrag(); if (wasDragging && cur) render(); return; }
+    if (!drag.el.isConnected) { killDrag(); return; }
     if (!drag.dragging && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 10) {
       drag.dragging = true;
       const r = drag.el.getBoundingClientRect();
       const g = drag.el.cloneNode(true); g.classList.add('ghost'); g.style.width = r.width + 'px';
+      g.removeAttribute('data-item'); g.setAttribute('aria-hidden', 'true');
       drag.dx = e.clientX - r.left; drag.dy = e.clientY - r.top;
-      document.body.appendChild(g); drag.ghost = g; drag.el.classList.add('dragging');
+      // Kopie im Rätselfenster statt auf der Seite: verschwindet garantiert mit dem Fenster
+      document.getElementById('panel').appendChild(g); drag.ghost = g; drag.el.classList.add('dragging');
     }
     if (drag.dragging) {
       drag.ghost.style.left = (e.clientX - drag.dx) + 'px'; drag.ghost.style.top = (e.clientY - drag.dy) + 'px';
@@ -203,15 +225,25 @@ const Puzzles = (() => {
   });
   const endDrag = e => {
     if (!drag || e.pointerId !== drag.pid) return;
-    const dd = drag; drag = null;
+    const dd = drag;
+    killDrag(); // zuerst aufräumen – egal was danach passiert
+    if (!cur) return;
     if (dd.dragging) {
-      dd.ghost.remove(); dd.el.classList.remove('dragging');
-      const t = document.elementFromPoint(e.clientX, e.clientY); const z = t && t.closest('[data-zone]');
-      if (z && cur) place(dd.id, z.dataset.zone); else if (cur) render();
-    } else if (cur && e.type === 'pointerup') tapCard(dd.id, dd.el);
+      if (e.type === 'pointerup') {
+        const t = document.elementFromPoint(e.clientX, e.clientY); const z = t && t.closest('[data-zone]');
+        if (z) { place(dd.id, z.dataset.zone); return; }
+      }
+      render();
+    } else if (e.type === 'pointerup' && dd.el.isConnected) tapCard(dd.id, dd.el);
   };
   window.addEventListener('pointerup', endDrag);
   window.addEventListener('pointercancel', endDrag);
+  // App-Wechsel, Bildschirmsperre, Drehen des iPads: laufendes Ziehen sicher beenden
+  const abortDrag = () => { if (!drag && !document.querySelector('.card.ghost')) return; const was = drag && drag.dragging; killDrag(); if (was && cur && !cur.justSolved) render(); };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) abortDrag(); });
+  window.addEventListener('blur', abortDrag);
+  window.addEventListener('pagehide', abortDrag);
+  window.addEventListener('orientationchange', abortDrag);
 
   function tapCard(id, elc) {
     const w = cur.w;
@@ -426,6 +458,7 @@ const Puzzles = (() => {
   }
 
   function solved() {
+    killDrag();
     const d = cur.def;
     cur.justSolved = true;
     api.markSolved(cur.id);
